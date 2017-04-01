@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+# CSSNANO-MULTI
+# -----------------------------------
+# I made this script as a wrapper for cssnano to easily minify multiple files in the
+# various ways I tend to in my build process.
+#
+# TODO:
+# -add usage information
+# -implement option for concatenation of minified files
+
+files=${1}
+nf=( $files )
+minifiedFiles=${2}
+nmf=( $minifiedFiles )
+
+if [[ -z "$files" ]]; then
+	echo "No files provided."
+	exit 1
+fi
+
+if [[ -z "$minifiedFiles" ]]; then
+	echo "No filenames were provided. Will not concatenate files. Minified files will have 'min.' prefix."
+
+	for (( i=0; i<${#nf[@]}; i++ ))
+	do
+		cssnano "${nf[i]}" > "$(dirname "${nf[i]}")/min.$(basename "${nf[i]}")"
+	done
+
+elif [[ ${#nmf[@]} == 1 ]]; then #minify a single or multiple files, if multiple concatenate into single file, with given name
+	echo "Files will be concatenated to $minifiedFiles"
+
+	if [[ "${#nf[@]}" -gt 1 ]]; then
+		needsConcat=1
+	else
+		needsConcat=0
+	fi
+
+	for (( i=0; i<${#nf[@]}; i++ ))
+	do
+		cssnano "${nf[i]}" > "$minifiedFiles"
+
+		if [[ "$needsConcat" -eq 1 ]]; then
+			mv "$minifiedFiles" "$(dirname "$minifiedFiles")/concat.$i.$(basename "$minifiedFiles")"
+		fi
+
+	done
+
+	if [[ "$needsConcat" -eq 1 ]]; then
+		##concatenate the files here, name the file according to $minifiedFiles
+		echo 'No concatenation functionality implemented.'
+	fi
+
+else #minify multiple files providing custom name for each minified file
+	if [[ ${#nf[@]} != "${#nmf[@]}" ]]; then
+		echo "When specifying custom names for  multiple minified files you must provide a filename for each corresponding file."
+		exit 1;
+	fi
+
+	for (( i=0; i<${#nf[@]}; i++ ))
+	do
+		cssnano "${nf[i]}" > "${nmf[i]}"
+	done
+
+fi
