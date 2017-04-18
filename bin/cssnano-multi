@@ -1,65 +1,108 @@
 #!/usr/bin/env bash
 
-# CSSNANO-MULTI
-# -----------------------------------
-# I made this script as a wrapper for cssnano to easily minify multiple files in the
-# various ways I tend to in my build process.
+#### CSSNANO-MULTI ####
+# Author: webDevGitsIt
+# cssnano-multi is a wrapper script for cssnano, allowing multiple file and directory
+# input. Intended to save some time from having to run the cssnano multiple times
+# against individual files. I use it in my build process.
 #
-# TODO:
-# -add usage information
-# -implement option for concatenation of minified files
+#### HOW TO USE ####
+# Command
+# cssnano-multi "<input>" "<optional output>"
+#
+# Default Behavior
+# 	If you input multiple files/directories without providing any output all minified
+# 	files will carry 'min.' prefix and will be output to the original's parent directory.
+# 		cssnano-multi "file1.css file2.css"
+#				//outputs min.file1.css & min.file2.css
+#
+# Custom Prefix
+# 	You can provide a custom prefix in the output argument. To specify output directory
+# 	prepend the prefix with a path.
+# 		cssnano-multi "someFile.css" "foo/bar/myPrefix"
+# 			//outputs myPrefix.someFile.css to foo/bar/
+#
+# Renaming files (Do not use with directory input)
+# 	For each file you input you must include a corresponding new filename in output.
+#		Renaming will only work when you have more than one input file, otherwise the
+#		new name is treated as a prefix.
+#			cssnano-multi "myFile.css anotherFile.css" "out/dir/thisFile.css diff/dir/anthrFile.css"
+#				//outputs thisFile.css & anthrFile.css
 
+# Directory input
+# 	Include a directory path in the input argument. You can technically use
+#		the renaming functionality with directory input, it is not recommended.
+# 		cssnano-multi "dir/path" "foo/bar/myPrefix"
+
+function minify () {
+	if [[ "$1" == "PREFIX_DEFUALT" ]]; then
+		for (( i=0; i<${#nf[@]}; i++ ))
+		do
+				cssnano "${nf[i]}" > "$(dirname "${nf[i]}")/min.$(basename "${nf[i]}")"
+		done
+
+	elif [[ "$1" == "PREFIX_SINGLE_MULTI" ]]; then
+		for (( i=0; i<${#nf[@]}; i++ ))
+		do
+			cssnano "${nf[i]}" > "$(dirname "$minifiedFiles")/$(basename "$minifiedFiles").$(basename "${nf[i]}")"
+		done
+
+	elif [[ "$1" == "PREFIX_EACH" ]]; then
+		for (( i=0; i<${#nf[@]}; i++ ))
+		do
+			cssnano "${nf[i]}" > "${nmf[i]}"
+		done
+
+	fi
+}
+
+function sanatizeInput () {
+	replaceDir=
+	for file in ${nf[*]};
+	do
+		if [[ -d "$file" ]]; then
+			replaceDir+=$(find "${file}" -name "*.css")
+			replaceDir+=" "
+		else
+			replaceDir+="${file} "
+		fi
+	done
+
+	nf=( "$replaceDir" )
+}
+
+#START INIT
 files=${1}
-nf=( $files )
+nf=( "$files" )
 minifiedFiles=${2}
-nmf=( $minifiedFiles )
+nmf=( "$minifiedFiles" )
 
 if [[ -z "$files" ]]; then
 	echo "No files provided."
 	exit 1
+else
+	sanatizeInput
 fi
+#END INIT
 
 if [[ -z "$minifiedFiles" ]]; then
-	echo "No filenames were provided. Will not concatenate files. Minified files will have 'min.' prefix."
+	echo "No output file(s) provided. Minified files will have 'min.' prefix."
 
-	for (( i=0; i<${#nf[@]}; i++ ))
-	do
-		cssnano "${nf[i]}" > "$(dirname "${nf[i]}")/min.$(basename "${nf[i]}")"
-	done
+	minify "PREFIX_DEFUALT"
 
-elif [[ ${#nmf[@]} == 1 ]]; then #minify a single or multiple files, if multiple concatenate into single file, with given name
-	echo "Files will be concatenated to $minifiedFiles"
+elif [[ ${#nmf[@]} == 1 ]]; then
+	echo "File(s) will carry prefix with: $(basename "$minifiedFiles")"
 
-	if [[ "${#nf[@]}" -gt 1 ]]; then
-		needsConcat=1
-	else
-		needsConcat=0
-	fi
+	minify "PREFIX_SINGLE_MULTI"
 
-	for (( i=0; i<${#nf[@]}; i++ ))
-	do
-		cssnano "${nf[i]}" > "$minifiedFiles"
-
-		if [[ "$needsConcat" -eq 1 ]]; then
-			mv "$minifiedFiles" "$(dirname "$minifiedFiles")/concat.$i.$(basename "$minifiedFiles")"
-		fi
-
-	done
-
-	if [[ "$needsConcat" -eq 1 ]]; then
-		##concatenate the files here, name the file according to $minifiedFiles
-		echo 'No concatenation functionality implemented.'
-	fi
-
-else #minify multiple files providing custom name for each minified file
+else
 	if [[ ${#nf[@]} != "${#nmf[@]}" ]]; then
-		echo "When specifying custom names for  multiple minified files you must provide a filename for each corresponding file."
+		echo "cssnano-multi:rename - Each file provided must have corresponding file in output argument."
 		exit 1;
 	fi
 
-	for (( i=0; i<${#nf[@]}; i++ ))
-	do
-		cssnano "${nf[i]}" > "${nmf[i]}"
-	done
+	minify "PREFIX_EACH"
 
 fi
+
+exit 0
